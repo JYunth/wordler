@@ -42,6 +42,21 @@ class WordleSolver:
             print(f"❌ Error: Word list not found at '{self.word_list_path}'.")
             sys.exit(1)
 
+    def _remove_word_from_database(self, word_to_remove):
+        """Removes a word from the word list file."""
+        import os
+        temp_file_path = self.word_list_path + ".tmp"
+        try:
+            with open(self.word_list_path, "r") as original_file, open(temp_file_path, "w") as temp_file:
+                for line in original_file:
+                    if line.strip().lower() != word_to_remove:
+                        temp_file.write(line)
+            os.replace(temp_file_path, self.word_list_path)
+        except Exception as e:
+            print(f"❌ Error removing word from database: {e}")
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
     def find_best_guess_frequency(self):
         """Analyzes possible words to find the best next guess based on letter frequency."""
         if not self.possible_words: return None
@@ -191,14 +206,26 @@ class WordleSolver:
                     colorized_suggestion += char
             print(f"💡 Suggested guess: {colorized_suggestion}")
 
+            last_guess = ""
             while True:
-                last_guess = input("Enter the word you guessed: ").lower()
-                if len(last_guess) != self.word_length:
+                last_guess = input("Enter the word you guessed (or '/new' for a different suggestion): ").lower()
+                if last_guess == '/new':
+                    if suggested_guess:
+                        print(f"Removing '{suggested_guess}' from the word list and getting a new suggestion.")
+                        self.all_words.remove(suggested_guess)
+                        if suggested_guess in self.possible_words:
+                            self.possible_words.remove(suggested_guess)
+                        self._remove_word_from_database(suggested_guess)
+                    break
+                elif len(last_guess) != self.word_length:
                     print(f"❌ Error: Guess must be {self.word_length} letters long.")
                 elif self.hard_mode and not self._is_valid_hard_mode_guess(last_guess):
                     continue
                 else:
                     break
+
+            if last_guess == '/new':
+                continue
 
             results_input = input(f"Enter results for '{last_guess}' (G=Green, Y=Yellow, -=Grey): ").lower()
             if len(results_input) != self.word_length or not all(c in 'gy-' for c in results_input):
